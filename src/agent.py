@@ -3,7 +3,7 @@ import random
 import copy
 from collections import namedtuple, deque
 
-from model import Actor, Critic
+from src.model import Actor, Critic
 
 import torch
 import torch.nn.functional as F
@@ -66,12 +66,13 @@ class Agent():
         for dst_wts, src_wts in zip(src.parameters(), dst.parameters()):
             dst_wts.data.copy_(src_wts.data)
 
-    def step(self, states, actions, rewards, next_states, dones):
+    def step(self, states, actions, rewards, next_states, is_dones):
         """Save experience in replay memory, and use random sample from buffer to learn."""
         # Save experience / reward
 
-        for state, action, reward, next_state, done in zip(states, actions, rewards, next_states, dones):
-            self.memory.add(state, action, reward, next_state, done)
+        # Doing this
+        for state, action, reward, next_state, is_done in zip(states, actions, rewards, next_states, is_dones):
+            self.memory.add(state, action, reward, next_state, is_done)
 
         # Learn, if enough samples are available in memory
         if len(self.memory) > BATCH_SIZE:

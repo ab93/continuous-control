@@ -11,7 +11,7 @@ from src.agent import Agent
 
 
 RANDOM_SEED = 42
-ENV_PATH = "Reacher_Linux_NoVis/Reacher.x86_64"
+ENV_PATH = "../Reacher_Linux_NoVis/Reacher.x86_64"
 BASELINE_SCORE = 30.0
 
 env: Optional[UnityEnvironment] = None
