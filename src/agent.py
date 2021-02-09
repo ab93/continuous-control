@@ -24,7 +24,7 @@ print("\nDevice:", device)
 class Agent():
     """Interacts with and learns from the environment."""
 
-    def __init__(self, state_size, action_size, random_seed):
+    def __init__(self, state_size, action_size, num_agents, random_seed):
         """Initialize an Agent object.
 
         Params
@@ -35,6 +35,7 @@ class Agent():
         """
         self.state_size = state_size
         self.action_size = action_size
+        self.num_agents = num_agents
         self.seed = random.seed(random_seed)
 
         # Actor Network (w/ Target Network)
@@ -54,16 +55,16 @@ class Agent():
         print("\nCritic network...\n", self.critic_local)
 
         # Noise process
-        self.noise = OUNoise(20 * action_size, random_seed)
+        self.noise = OUNoise(self.num_agents * action_size, random_seed)
 
         # Replay memory
         self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, random_seed)
 
     @classmethod
-    def copy_weights(cls, source, target):
-        """Copies the weights from the source to the target"""
-        for target_param, source_param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(source_param.data)
+    def copy_weights(cls, src, dst):
+        """Clones the weights from the source to the target"""
+        for dst_wts, src_wts in zip(src.parameters(), dst.parameters()):
+            dst_wts.data.copy_(src_wts.data)
 
     def step(self, states, actions, rewards, next_states, dones):
         """Save experience in replay memory, and use random sample from buffer to learn."""
@@ -85,7 +86,7 @@ class Agent():
             action = self.actor_local(state).cpu().data.numpy()
         self.actor_local.train()
         if add_noise:
-            action += weight * self.noise.sample().reshape((-1, 4))
+            action += weight * self.noise.sample().reshape((-1, self.action_size))
         return np.clip(action, -1, 1)
 
     def reset(self):

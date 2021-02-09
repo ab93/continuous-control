@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from collections import deque
 from typing import List, Optional
 
@@ -6,11 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from unityagents import UnityEnvironment
 
-from agent import Agent
+from src.agent import Agent
 
 
 RANDOM_SEED = 42
-ENV_PATH = "Reacher_Linux_NoVis_v2/Reacher.x86_64"
+ENV_PATH = "Reacher_Linux_NoVis/Reacher.x86_64"
 BASELINE_SCORE = 30.0
 
 env: Optional[UnityEnvironment] = None
@@ -47,74 +48,26 @@ def examine_env():
     print('There are {} agents. Each observes a state with length: {}'.format(states.shape[0], state_size))
     print('The state for the first agent looks like:', states[0])
 
+    init_agent(state_size, action_size, num_agents)
 
-def init_env():
+
+def init_env(path):
     global env
 
     print("\nInitializing env....")
-    env = UnityEnvironment(file_name=ENV_PATH)
+    env = UnityEnvironment(file_name=path)
     examine_env()
 
 
-def init_agent():
+def init_agent(state_size, action_size, num_agents):
     global agent
 
     print("\nInitializing agent....")
-    agent = Agent(state_size=33, action_size=4, random_seed=42)
+    agent = Agent(state_size=state_size, action_size=action_size, num_agents=num_agents,
+                  random_seed=RANDOM_SEED)
 
 
-def train_agent(n_episodes=1000, max_t=1000, print_every=100, noise_decay_factor=0.99, noise_wt_min=0.1):
-    global env, agent
-
-    brain_name, _ = get_brain(env)
-
-    print("\nStarting to train the agent....\n")
-
-    rolling_scores = deque(maxlen=print_every)
-    scores = []
-    noise_factor = 1.0
-
-    for i_episode in range(1, n_episodes+1):
-        env_info = env.reset(train_mode=True)[brain_name]
-        state = env_info.vector_observations[0]
-        agent.reset()
-        score = 0
-
-        for t in range(max_t):
-            action = agent.act(state)
-            env_info = env.step(action)[brain_name]
-
-            reward = env_info.rewards[0]
-            next_state = env_info.vector_observations[0]
-            is_done = env_info.local_done[0]
-
-            agent.step(state, action, reward, next_state, is_done)
-            state = next_state
-            score += reward
-            if is_done:
-                break
-
-        rolling_scores.append(score)
-        scores.append(score)
-
-        rolling_mean_score = np.mean(rolling_scores)
-
-        print('\rEpisode {}\tEpisode Score: {:.2f}\t'
-              'Average Score: {:.2f}'.format(i_episode, score, rolling_mean_score), end="")
-        if i_episode % print_every == 0:
-            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, rolling_mean_score))
-
-        if rolling_mean_score >= BASELINE_SCORE:
-            print('\nEnvironment solved in {:d} Episodes \t'
-                  'Average Score: {:.2f}'.format(i_episode, rolling_mean_score))
-            torch.save(agent.actor_local.state_dict(), 'weights/checkpoint_actor.pth')
-            torch.save(agent.critic_local.state_dict(), 'weights/checkpoint_critic.pth')
-            break
-
-    return scores
-
-
-def train_multi_agents(n_episodes=1000, max_t=10000, print_every=100, noise_decay_factor=0.99, noise_wt_min=0.1):
+def train_agent(n_episodes=1000, max_t=2500, print_every=100, noise_decay_factor=0.99, noise_wt_min=0.1):
     global env, agent
 
     brain_name, _ = get_brain(env)
@@ -130,7 +83,7 @@ def train_multi_agents(n_episodes=1000, max_t=10000, print_every=100, noise_deca
         env_info = env.reset(train_mode=True)[brain_name]
         states = env_info.vector_observations
         agent.reset()
-        agent_scores = np.zeros(20)
+        agent_scores = np.zeros(len(env_info.agents))
 
         for t in range(max_t):
             actions = agent.act(states, weight=noise_wt)
@@ -159,7 +112,10 @@ def train_multi_agents(n_episodes=1000, max_t=10000, print_every=100, noise_deca
               'Average Score: {:.2f}'.format(i_episode, avg_agent_score, noise_wt,
                                              max_score, rolling_mean_score), end="")
         if i_episode % print_every == 0:
-            print('\rEpisode {}\tAverage Score: {:.2f}'.format(i_episode, rolling_mean_score))
+            print('\rEpisode {}\tEpisode Score: {:.2f}\t'
+                  'Noise Factor: {:.2f}\tMax Score: {:.2f}\t'
+                  'Average Score: {:.2f}'.format(i_episode, avg_agent_score, noise_wt,
+                                             max_score, rolling_mean_score), end="")
 
         if rolling_mean_score >= BASELINE_SCORE:
             print('\nEnvironment solved in {:d} Episodes \t'
@@ -171,20 +127,28 @@ def train_multi_agents(n_episodes=1000, max_t=10000, print_every=100, noise_deca
     return scores
 
 
-def plot_rewards(scores: List[float]):
+def plot_rewards(scores_: List[float]):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    plt.plot(np.arange(1, len(scores) + 1), scores)
+    plt.plot(np.arange(1, len(scores_) + 1), scores_)
     plt.ylabel("Score")
     plt.xlabel("Episode #")
     plt.show()
 
 
 if __name__ == "__main__":
-    init_env()
-    init_agent()
 
-    scores = train_multi_agents(print_every=50)
+    parser = ArgumentParser(description="Train using DDPG algorithm")
+    parser.add_argument("--path", dest="path", type=str, required=True,
+                        help="Path of the Reacher Unity environment")
+    parser.add_argument("--print_every", dest="print_every", type=int, default=50,
+                        help="Print every given lines")
+
+    args = parser.parse_args()
+
+    init_env(args.path)
+
+    scores = train_agent(print_every=args.print_every)
     plot_rewards(scores)
 
     env.close()
