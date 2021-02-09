@@ -1,3 +1,5 @@
 .idea/
 .ipynb_checkpoints/
 unity-environment.log
+__pycache__/
+*.odt
